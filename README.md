@@ -2,6 +2,8 @@
 
 **NEURO-LINK** is a futuristic, web-based interface designed to control robotic arms via Arduino. It features a real-time 3D visualizer, a powerful timeline sequencer for automation, and direct hardware control using the Web Serial API.
 
+<img width="853" height="881" alt="image" src="https://github.com/user-attachments/assets/951c116f-1685-4ffa-bf2d-dddf40c527fc" />
+
 ## 🚀 Features
 
 ### 🎮 Control & Interface
