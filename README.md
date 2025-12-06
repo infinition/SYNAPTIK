@@ -6,6 +6,8 @@ https://infinition.github.io/SYNAPTIK/
 
 <img width="853" height="881" alt="image" src="https://github.com/user-attachments/assets/951c116f-1685-4ffa-bf2d-dddf40c527fc" />
 
+![adf5169bae194ba4a8c427642d39150b (1)](https://github.com/user-attachments/assets/d6086985-39ad-4cdf-8629-48a7e2598176)
+
 ## 🚀 Features
 
 ### 🎮 Control & Interface
