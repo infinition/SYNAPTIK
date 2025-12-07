@@ -699,41 +699,106 @@ class UIManager {
         let code = `// NEURO-LINK ARM CONTROLLER - Generated Code
 #include <Servo.h>
 
-    `;
+// --- PARAMÈTRES DE VITESSE (Plus le chiffre est grand, plus c'est LENT/FLUIDE) ---
+const int SPEED_HEAVY = 15;     // Base (Type: base)
+const int SPEED_MEDIUM = 10;    // Joint/Wrist (Type: joint, wrist)
+const int SPEED_FAST = 2;       // Pince (Type: claw)
+
+// --- Structure pour gérer un servo de façon fluide ---
+struct SmoothServo {
+  Servo servo;
+  int pin;
+  float currentAngle;
+  int targetAngle;
+  int speedDelay;
+  unsigned long lastMove;
+  
+  void attach(int p, int startAngle, int spd) {
+    pin = p;
+    currentAngle = startAngle;
+    targetAngle = startAngle;
+    speedDelay = spd;
+    servo.attach(pin);
+    servo.write(startAngle);
+    lastMove = millis();
+  }
+
+  void setTarget(int angle) {
+    targetAngle = constrain(angle, 0, 180);
+  }
+
+  void update() {
+    if (millis() - lastMove >= speedDelay) {
+      lastMove = millis();
+      if (abs(currentAngle - targetAngle) > 0.5) {
+        if (currentAngle < targetAngle) {
+          currentAngle += 1.0; 
+        } else {
+          currentAngle -= 1.0;
+        }
+        servo.write((int)currentAngle);
+      }
+    }
+  }
+};
+
+`;
+
         // Declare servos
         this.arm.servos.forEach(servo => {
-            code += `Servo servo${servo.id}; // ${servo.name}\n`;
+            code += `SmoothServo servo${servo.id}; // ${servo.name}\n`;
         });
 
         code += `
-    void setup() {
-    Serial.begin(9600);
-    `;
+void setup() {
+  Serial.begin(9600); 
+
+  // Initialisation : (Pin, Angle Départ, Vitesse)
+`;
+
         // Attach servos
         this.arm.servos.forEach(servo => {
-            code += ` servo${servo.id}.attach(${servo.pin}); // ${servo.name}\n`;
+            let speed = 'SPEED_MEDIUM';
+            if (servo.type === 'base') speed = 'SPEED_HEAVY';
+            else if (servo.type === 'claw') speed = 'SPEED_FAST';
+
+            const start = servo.startAngle !== undefined ? servo.startAngle : 90;
+            code += `  servo${servo.id}.attach(${servo.pin}, ${start}, ${speed}); // ${servo.name}\n`;
         });
 
         code += `}
 
-    void loop() {
-    if (Serial.available() > 0) {
-    String data = Serial.readStringUntil('\\n');
-    int colonIndex = data.indexOf(':');
-    if (colonIndex > 0) {
-    int pin = data.substring(0, colonIndex).toInt();
-    int angle = data.substring(colonIndex + 1).toInt();
-
-    `;
-        // Write to servos
+void loop() {
+  // 1. Mise à jour physique des servos
+`;
+        // Update servos
         this.arm.servos.forEach(servo => {
-            code += ` if (pin == ${servo.pin}) servo${servo.id}.write(angle);\n`;
+            code += `  servo${servo.id}.update();\n`;
         });
 
-        code += ` }
-    }
-    }
-    `;
+        code += `
+  // 2. Lecture des données série
+  if (Serial.available() > 0) {
+    String data = Serial.readStringUntil('\\n');
+    int separatorIndex = data.indexOf(':');
+
+    if (separatorIndex > 0) {
+      int pin = data.substring(0, separatorIndex).toInt();
+      int angle = data.substring(separatorIndex + 1).toInt();
+
+`;
+        // Map pins to servos
+        let first = true;
+        this.arm.servos.forEach(servo => {
+            const elseStr = first ? '' : 'else ';
+            code += `      ${elseStr}if (pin == ${servo.pin}) servo${servo.id}.setTarget(angle);\n`;
+            first = false;
+        });
+
+        code += `    }
+  }
+}
+`;
         return code;
     }
 
