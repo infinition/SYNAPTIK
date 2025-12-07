@@ -168,7 +168,8 @@ class GamepadManager extends EventTarget {
             if (map.type === 'axis') {
                 if (map.index < activeGP.axes.length) {
                     let val = activeGP.axes[map.index];
-                    if (Math.abs(val) < 0.1) val = 0;
+                    const deadzone = map.deadzone !== undefined ? map.deadzone : 0.1;
+                    if (Math.abs(val) < deadzone) val = 0;
                     inputVal = val;
                 }
             } else if (map.type === 'button') {
@@ -181,9 +182,24 @@ class GamepadManager extends EventTarget {
             let targetAngle;
 
             if (map.type === 'axis') {
-                targetAngle = center + (inputVal * (range / 2));
-                if (Math.abs(targetAngle - servo.angle) > 1) {
-                    this.arm.updateServo(servo.id, targetAngle);
+                // Check for control mode (absolute vs incremental)
+                if (map.controlMode === 'incremental') {
+                    const speed = 2.0; // Degrees per tick
+                    // Use a small threshold for movement in incremental mode, slightly above deadzone if needed, 
+                    // but since we already zeroed out val based on deadzone, we can just check for non-zero.
+                    if (Math.abs(inputVal) > 0) {
+                        const requestedAngle = servo.angle + (inputVal * speed);
+                        targetAngle = Math.max(servo.min, Math.min(servo.max, requestedAngle));
+                        if (targetAngle !== servo.angle) {
+                            this.arm.updateServo(servo.id, targetAngle);
+                        }
+                    }
+                } else {
+                    // Default: Absolute (Spring-centered)
+                    targetAngle = center + (inputVal * (range / 2));
+                    if (Math.abs(targetAngle - servo.angle) > 1) {
+                        this.arm.updateServo(servo.id, targetAngle);
+                    }
                 }
             } else if (map.type === 'button') {
                 const step = 2;
@@ -206,8 +222,16 @@ class GamepadManager extends EventTarget {
     }
 
     setMapping(servoId, type, index) {
-        this.mappings[servoId] = { type, index, invert: false };
+        // Default to absolute for axis, with 0.1 deadzone
+        this.mappings[servoId] = { type, index, invert: false, controlMode: 'absolute', deadzone: 0.1 };
         this.dispatchEvent(new CustomEvent('mapping-change'));
+    }
+
+    updateMapping(servoId, updates) {
+        if (this.mappings[servoId]) {
+            this.mappings[servoId] = { ...this.mappings[servoId], ...updates };
+            this.dispatchEvent(new CustomEvent('mapping-change'));
+        }
     }
 
     getMapping(servoId) { return this.mappings[servoId]; }

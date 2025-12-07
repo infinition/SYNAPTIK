@@ -866,15 +866,33 @@ class UIManager {
             if (servo.inverted) this.toggleInvertServo.classList.add('active');
             else this.toggleInvertServo.classList.remove('active');
         }
-
         const mapBtn = document.getElementById('settings-btn-map');
         const map = this.gamepad.getMapping(servoId);
+        const controlStyleGroup = document.getElementById('group-control-style');
+        const controlStyleSelect = document.getElementById('settings-control-style');
+        const deadzoneGroup = document.getElementById('group-deadzone');
+        const deadzoneInput = document.getElementById('settings-deadzone');
+
         if (map) {
             mapBtn.textContent = map.type === 'axis' ? `AXIS ${map.index}` : `BTN ${map.index}`;
             mapBtn.className = 'btn success';
+
+            // Show and populate control style
+            if (controlStyleGroup && controlStyleSelect) {
+                controlStyleGroup.style.display = 'block';
+                controlStyleSelect.value = map.controlMode || 'absolute';
+                controlStyleSelect.disabled = false;
+            }
+            // Show and populate deadzone
+            if (deadzoneGroup && deadzoneInput) {
+                deadzoneGroup.style.display = 'block';
+                deadzoneInput.value = map.deadzone !== undefined ? map.deadzone : 0.1;
+            }
         } else {
             mapBtn.textContent = 'NO MAP';
             mapBtn.className = 'btn secondary';
+            if (controlStyleGroup) controlStyleGroup.style.display = 'none';
+            if (deadzoneGroup) deadzoneGroup.style.display = 'none';
         }
 
         mapBtn.onclick = () => {
@@ -918,11 +936,24 @@ class UIManager {
         };
 
         this.arm.updateServoConfig(this.currentSettingsServoId, updates);
-        document.getElementById('servo-settings-modal').classList.remove('show');
-        Utils.showNotification('Servo settings saved', 'success');
+
+        // Save Control Style and Deadzone if mapped
+        const controlStyleSelect = document.getElementById('settings-control-style');
+        const deadzoneInput = document.getElementById('settings-deadzone');
+        if (controlStyleSelect && deadzoneInput && this.gamepad.getMapping(this.currentSettingsServoId)) {
+            this.gamepad.updateMapping(this.currentSettingsServoId, {
+                controlMode: controlStyleSelect.value,
+                deadzone: parseFloat(deadzoneInput.value)
+            });
+        }
+
+        this.closeModals();
+        this.renderConfig();
     }
 
-    // --------- CONFIG GLOBAL (auto-save / export) ---------
+    closeModals() {
+        document.querySelectorAll('.modal-overlay').forEach(m => m.classList.remove('show'));
+    }
 
     // Renvoie l'état complet (servos, mappings, display, viewer, theme...)
     getCurrentConfigData() {
